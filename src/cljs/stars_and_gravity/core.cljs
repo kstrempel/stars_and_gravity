@@ -2,29 +2,30 @@
 
 (def width (atom 0))
 (def height (atom 0))
-
 (def particels (atom []))
-
+(def lines (atom []))
 (def canvas (.getElementById js/document "stars")) 
-
 (def ctx (.getContext canvas "2d"))
 
 (defn init-particels [count]
   (swap! particels
-         (fn [_] 
+         (fn [i] 
            (map #(hash-map :x (* @width (Math/random))
                            :y (* @height (Math/random))
                            :vx (- (* 2 (Math/random)) 1)
-                           :vy (- (* 2 (Math/random)) 1))
+                           :vy (- (* 2 (Math/random)) 1)
+                           :id i)
                 (range count)))))
 
-(defn paint-stars [stars]
-  (doseq [star stars]
-    (set! (.-fillStyle ctx) "rgba(100,100,100,0.4)")
+(defn paint-stars []
+  (.beginPath ctx)
+  (set! (.-fillStyle ctx) "rgba(0,0,0,0.5)")
+  (doseq [star @particels]
     (.beginPath ctx)
     (.arc ctx (:x star) (:y star) 1 0 (* 2 Math/PI) false)
     (.fill ctx)
-    (.closePath ctx)))
+    (.closePath ctx))
+  (.closePath ctx))
 
 (defn distance [star-a star-b]
   (let [dx (- (:x star-a) (:x star-b))
@@ -33,9 +34,14 @@
      :star-a star-a
      :star-b star-b}))
     
-(defn paint-line [a b]
-  (.moveTo ctx (:x a) (:y a))
-  (.lineTo ctx (:x b) (:y b))
+(defn paint-lines []
+  (.beginPath ctx)
+  (set! (.-strokeStyle ctx) "rgba(0,0,0,0.1)")
+  (doseq [combination @lines]
+    (let [a (:star-a combination)
+          b (:star-b combination)]                  
+      (.moveTo ctx (:x a) (:y a))
+      (.lineTo ctx (:x b) (:y b))))
   (.stroke ctx)
   (.closePath ctx))
 
@@ -46,14 +52,15 @@
           @particels))
 
 (defn update-lines []
-  (let [calc-distances (distances)
-        filtered-distances (filter #(> 50 (:distance %)) calc-distances)]
-    (doseq [combination filtered-distances]
-      (paint-line (:star-a combination) (:star-b combination)))))
+  (let [calc-distances (distances)]
+    (swap! lines (fn [_] 
+                   (doall
+                    (filter #(> 50 (:distance %)) calc-distances))))))
 
 (defn update-particles []
   (swap! particels 
          (fn [particels]
+           (doall
              (map #(let [border (fn [value velocity max]
                                   (let [new (+ value velocity)]
                                     (cond
@@ -63,14 +70,15 @@
                      (assoc %1 
                        :x (border (:x %1) (:vx %1) @width)
                        :y (border (:y %1) (:vy %1) @height)))
-                particels))))
+                particels)))))
                      
 (defn paint []
   (update-particles)
   (update-lines)
-  (set! (.-fillStyle ctx) "rgba(255,255,255,0.9)")
+  (set! (.-fillStyle ctx) "rgb(255,255,255)")
   (.fillRect ctx 0 0 @width @height)
-  (paint-stars @particels)
+  (paint-stars)
+  (paint-lines)
   (.requestAnimationFrame js/window animate))  
 
 (defn animate [particel]
@@ -85,6 +93,6 @@
 (defn main []
   (resize)
   (set! (.-onresize js/window) #(resize))
-  (init-particels 30)
+  (init-particels 50)
   (animate particels))
       
